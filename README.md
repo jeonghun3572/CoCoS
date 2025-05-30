@@ -84,7 +84,7 @@ deepspeed \
         --report_to wandb \
         --wandb_run_name ${wandb_run_name} \
         --rloo_k ${rloo_k} \
-        --weight ${weight} \
+        --gamma ${gamma} \
 ```
 
 * Test
