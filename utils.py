@@ -91,16 +91,16 @@ def calcul_reward(correct):
     return float(correct.split("_")[1])
 
 
-def correction_reward(num_turns, corrects, weight=0.5):
+def correction_reward(num_turns, corrects, gamma=0.5):
     rewards = 0.0
     prev_reward = 0.0
     turn = num_turns
     for correct in corrects:
         curr_reward = calcul_reward(correct)
-        if weight == 0.0:
+        if gamma == 0.0:
             rewards = curr_reward - prev_reward
         else:
-            rewards += (weight ** (turn - 1)) * (curr_reward - prev_reward)
+            rewards += (gamma ** (turn - 1)) * (curr_reward - prev_reward)
         prev_reward = curr_reward
         turn -= 1
         if turn == 0:
@@ -153,13 +153,13 @@ def get_reward(tokenizer, query_responses, test_lists, num_turns, corrects=None,
 
             corrects[i].append(f"pass_{correct_count}_{len(test_list)}")
             total_correct.append(corrects[i])
-            rewards = correction_reward(num_turns, corrects[i], weight=0.5)
+            rewards = correction_reward(num_turns, corrects[i], gamma=0.5)
         total_reward.append(rewards)
 
     return torch.Tensor(total_reward), total_correct, total_responses_for_prompt
 
 
-def get_reward_one_reward(tokenizer, query_responses, test_lists, num_turns, responses_for_prompt, weight=0.5):
+def get_reward_one_reward(tokenizer, query_responses, test_lists, num_turns, responses_for_prompt, gamma=0.5):
     query_responses = tokenizer.batch_decode(
         query_responses,
         skip_special_tokens=True,
@@ -192,7 +192,7 @@ def get_reward_one_reward(tokenizer, query_responses, test_lists, num_turns, res
         corrects = []
         corrects.append(f"pass_{prev_correct_count}_{len(test_list)}")
         corrects.append(f"pass_{curr_correct_count}_{len(test_list)}")
-        rewards = correction_reward(num_turns, corrects, weight=weight)
+        rewards = correction_reward(num_turns, corrects, gamma=gamma)
         total_reward.append(rewards)
 
     return torch.Tensor(total_reward)
@@ -283,7 +283,7 @@ def get_reward_humaneval(tokenizer, query_responses, test_lists, num_turns, corr
     return total_correct, total_responses_for_prompt
 
 
-def get_reward_score(tokenizer, query_responses, test_lists, num_turns, responses_for_prompt, weight=0.5):
+def get_reward_score(tokenizer, query_responses, test_lists, num_turns, responses_for_prompt, gamma=0.5):
     query_responses = tokenizer.batch_decode(
         query_responses,
         skip_special_tokens=True,

@@ -70,7 +70,7 @@ class CoCoSConfig(OnPolicyConfig):
         default=2,
         metadata={"help": "Number of turns."},
     )
-    weight: float = field(
+    gamma: float = field(
         default=0.5,
-        metadata={"help": "Reward weight."},
+        metadata={"help": "Discount factor."},
     )

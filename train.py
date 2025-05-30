@@ -97,7 +97,7 @@ def main(args):
         greater_is_better=True,
         metric_for_best_model="eval_reward",
         num_turns=args.num_turns,
-        weight=args.weight,
+        gamma=args.gamma,
     )
 
     data_collator = Collator()
@@ -150,7 +150,7 @@ if __name__ == "__main__":
     parser.add_argument("--report_to", type=str, default="tensorboard")
     parser.add_argument("--save_steps", type=float, default=0.1)
     parser.add_argument("--num_turns", type=int, default=2)
-    parser.add_argument("--weight", type=float, default=0.5)
+    parser.add_argument("--gamma", type=float, default=0.5, help="Discount factor for rewards")
 
     # DeepSpeed
     parser.add_argument("--local_rank", type=int)

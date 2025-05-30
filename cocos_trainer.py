@@ -385,7 +385,7 @@ class CoCoSTrainer(Trainer):
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
 
                     score = get_reward_one_reward(
-                        processing_class, postprocessed_response, test_list, self.num_turns, reponse_for_prompt, args.weight,
+                        processing_class, postprocessed_response, test_list, self.num_turns, reponse_for_prompt, args.gamma,
                     )
 
                     responses.append(response)
