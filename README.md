@@ -3,7 +3,7 @@
 
 This is the official implementation of the following paper:
 
-> **Self-Correcting Code Generation Using Small Language Models** [[Paper](https://arxiv.org/abs/2505.23060)]
+> **Self-Correcting Code Generation Using Small Language Models** [[paper](https://arxiv.org/abs/2505.23060)]
 
 ## Environment Setup
 ```
@@ -12,8 +12,8 @@ conda env create -f environment.yml
 
 ## Datasets
 Download the datasets:
-* Program Synthesis with Large Language Models (MBPP) [[gihub](https://github.com/google-research/google-research/tree/master/mbpp)]
-* (Optional) KodCode: A Diverse, Challenging, and Verifiable Synthetic Dataset for Coding (KodCode) [[gihub](https://github.com/KodCode-AI/kodcode)]
+* Program Synthesis with Large Language Models (MBPP) [[github](https://github.com/google-research/google-research/tree/master/mbpp)]
+* (Optional) KodCode: A Diverse, Challenging, and Verifiable Synthetic Dataset for Coding (KodCode) [[github](https://github.com/KodCode-AI/kodcode)]
 
 
 ## Data Format
@@ -23,8 +23,8 @@ We follow the MBPP data format.
     "text": {question},
     "code": {canonical_solution},
     "test_list": [
-        "assert 1",
-        "assert 2",
+        "assert ~",
+        "assert ~",
         ...
     ]
 }
@@ -39,12 +39,12 @@ We trained CoCoS using the Boost model, but this is not mandatory. If you do not
 ```
 [
     {
-        "prompt": {question}[BEGIN],
-        "completion": {first turn}[DONE],
+        "prompt": {question}\n\n[BEGIN],
+        "completion": {first turn}\n[DONE],
     },
     {
-        "prompt": {question}[BEGIN]{first turn}[DONE]{auxiliary instruction}[CORRECT],
-        "completion" {second turn}[DONE]
+        "prompt": {question}\n\n[BEGIN]\n{first turn}\n[DONE]\n\n{auxiliary instruction}\n\n[CORRECT],
+        "completion" {second turn}\n[DONE]
     }
 ]
 ```
