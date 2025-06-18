@@ -5,6 +5,9 @@ This is the official implementation of the following paper:
 
 > **Self-Correcting Code Generation Using Small Language Models** [[paper](https://arxiv.org/abs/2505.23060)]
 
+## Model Checkpoints
+The checkpoints are available on the Hugging Face [[model](https://huggingface.co/jeonghuncho)]
+
 ## Environment Setup
 ```
 conda env create -f environment.yml
