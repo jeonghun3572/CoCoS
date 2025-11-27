@@ -35,32 +35,35 @@ def main(args):
     model.config.use_cache = False
 
     model_id = args.model_name_or_path.lower()
+
+    ## begin_token_id = [BEGIN
+    ## correct_token_id = [CORRECT
     if "llama" in model_id:
         model.config.pad_token_id = 128004
         tokenizer.pad_token = "<|finetune_right_pad_id|>"
         tokenizer.pad_token_id = 128004
-        response_template_ids = [33722, 16841]
-        response_template_ids_2 = [44604, 878, 45940]
+        begin_token_id = [33722, 16841]
+        correct_token_id = [44604, 878, 45940]
 
     elif "qwen" in model_id:
         model.config.pad_token_id = 151643
         tokenizer.pad_token = "<|endoftext|>"
         tokenizer.pad_token_id = 151643
-        response_template_ids = [32622, 16436]
-        response_template_ids_2 = [43504, 868, 44840]
+        begin_token_id = [32622, 16436]
+        correct_token_id = [43504, 868, 44840]
     
     elif "deepseek" in model_id:
         model.config.pad_token_id = 32014
         tokenizer.pad_token = "<|end▁of▁sentence|>"
         tokenizer.pad_token_id = 32014
-        response_template_ids = [58, 29509, 60]
-        response_template_ids_2 = [58, 34, 1692, 25661, 60]
+        begin_token_id = [58, 29509, 60]
+        correct_token_id = [58, 34, 1692, 25661, 60]
 
     model.resize_token_embeddings(len(tokenizer))
     max_seq_len = 8192
     data_collator = BoostCollator(
-        response_template=response_template_ids,
-        response_template_2=response_template_ids_2,
+        response_template=begin_token_id,
+        response_template_2=correct_token_id,
         tokenizer=tokenizer
     )
     args.gradient_accumulation_steps = args.global_batch_size // args.per_device_train_batch_size // torch.cuda.device_count()
