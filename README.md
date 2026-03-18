@@ -1,11 +1,9 @@
 <h1 align="center">CoCoS: Self-Correcting Code Generation Using Small Language Models</h1>
 
-This is the official implementation of the following paper:
-
-> **Self-Correcting Code Generation Using Small Language Models** [[paper](https://arxiv.org/abs/2505.23060)]
-
-## Model Checkpoints
-The checkpoints are available on the Hugging Face [[model](https://huggingface.co/jeonghuncho)]
+<p align="center">
+  <a href="https://arxiv.org/abs/2505.23060"><img src="https://img.shields.io/badge/arXiv-2501.13567-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://huggingface.co/jeonghuncho/models"><img src="https://img.shields.io/badge/%F0%9F%A4%97-Models-yellow.svg" alt="HuggingFace"></a>
+</p>
 
 ## Project Structure
 ```
@@ -127,13 +125,13 @@ python test.py \
 
 ```bibtex
 @misc{cho2025selfcorrectingcodegenerationusing,
-      title={Self-Correcting Code Generation Using Small Language Models},
+      title={Self-Correcting Code Generation Using Small Language Models}, 
       author={Jeonghun Cho and Deokhyung Kang and Hyounghun Kim and Gary Geunbae Lee},
       year={2025},
       eprint={2505.23060},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2505.23060},
+      url={https://arxiv.org/abs/2505.23060}, 
 }
 ```
 
