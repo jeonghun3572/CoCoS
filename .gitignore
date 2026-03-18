@@ -1,1 +1,42 @@
-/datasets
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Environment
+.env
+venv/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+
+# Data and outputs
+/datasets/
+/outputs/
+/checkpoints/
+
+# Model artifacts
+*.pt
+*.bin
+*.safetensors
+!training_args.bin
+
+# Logs
+wandb/
+runs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

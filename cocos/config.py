@@ -36,19 +36,19 @@ class CoCoSConfig(OnPolicyConfig):
     )
     normalize_reward: bool = field(
         default=False,
-        metadata={"help": "Whether to normalize rewards"},
+        metadata={"help": "Whether to normalize rewards."},
     )
     reward_clip_range: float = field(
         default=10.0,
-        metadata={"help": "Clip range for rewards"},
+        metadata={"help": "Clip range for rewards."},
     )
     normalize_advantage: bool = field(
         default=False,
-        metadata={"help": "Whether to normalize advantages"},
+        metadata={"help": "Whether to normalize advantages."},
     )
     token_level_kl: bool = field(
         default=False,
-        metadata={"help": "Whether to use token-level KL penalty or sequence-level KL penalty"},
+        metadata={"help": "Whether to use token-level KL penalty or sequence-level KL penalty."},
     )
     ds3_gather_for_generation: bool = field(
         default=True,

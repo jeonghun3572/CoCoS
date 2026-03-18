@@ -1,9 +1,10 @@
 import warnings
+from typing import Any, Optional, Union
+
 import numpy as np
 import torch
-
-from typing import Any, Optional, Union
 from transformers import DataCollatorForLanguageModeling
+
 
 class BoostCollator(DataCollatorForLanguageModeling):
     def __init__(
@@ -20,18 +21,14 @@ class BoostCollator(DataCollatorForLanguageModeling):
         super().__init__(*args, mlm=mlm, **kwargs)
         self.instruction_template = instruction_template
         if isinstance(instruction_template, str):
-            # The user provides a string, must tokenize
             self.instruction_token_ids = self.tokenizer.encode(self.instruction_template, add_special_tokens=False)
         else:
-            # The user already provides the token ids
             self.instruction_token_ids = instruction_template
 
         self.response_template = response_template
         if isinstance(response_template, str):
-            # The user provides a string, must tokenize
             self.response_token_ids = self.tokenizer.encode(self.response_template, add_special_tokens=False)
         else:
-            # The user already provides the token ids
             self.response_token_ids = response_template
             self.response_token_ids_2 = response_template_2
 
@@ -46,7 +43,6 @@ class BoostCollator(DataCollatorForLanguageModeling):
 
         self.ignore_index = ignore_index
         self.padding_free = padding_free
-
 
     def torch_call(self, examples: list[Union[list[int], Any, dict[str, Any]]]) -> dict[str, Any]:
         batch = super().torch_call(examples)
@@ -82,19 +78,15 @@ class BoostCollator(DataCollatorForLanguageModeling):
                         batch["labels"][i, :] = self.ignore_index
                     else:
                         response_token_ids_end_idx = response_token_ids_start_idx + len(self.response_token_ids)
-
-                        # Make pytorch loss function ignore all tokens up through the end of the response key
                         batch["labels"][i, :response_token_ids_end_idx] = self.ignore_index
 
         if self.padding_free:
-            # remove padding, `attention_mask` and add `position_ids`
             attn_mask = batch.pop("attention_mask")
             batch["input_ids"] = batch["input_ids"][attn_mask.bool()].unsqueeze(0)
             batch["position_ids"] = attn_mask.cumsum(1)[attn_mask.bool()].unsqueeze(0) - 1
             batch["labels"] = batch["labels"][attn_mask.bool()].unsqueeze(0)
             batch["labels"][batch["position_ids"] == 0] = self.ignore_index
 
-            # Calculate cumulative sequence lengths for queries and keys to prevent graph breaks during further computations.
             flattened_position_ids = batch["position_ids"].flatten()
             indices_q = torch.arange(
                 flattened_position_ids.size(0), device=flattened_position_ids.device, dtype=torch.int32
@@ -109,7 +101,6 @@ class BoostCollator(DataCollatorForLanguageModeling):
             ).unsqueeze(0)
             batch["cu_seq_lens_k"] = batch["cu_seq_lens_q"]
 
-            # Determine maximum sequence lengths to prevent graph breaks during further computations.
             batch["max_length_k"] = torch.tensor([flattened_position_ids.max().item() + 1])
             batch["max_length_q"] = batch["max_length_k"]
 

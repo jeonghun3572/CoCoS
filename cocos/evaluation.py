@@ -1,27 +1,29 @@
+"""
+Code evaluation module based on the HumanEval benchmark.
+
+Adapted from: https://github.com/openai/human-eval
+"""
+
 import contextlib
 import faulthandler
 import io
+import itertools
 import multiprocessing
 import os
 import platform
 import signal
 import tempfile
-import itertools
 from collections import Counter, defaultdict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import numpy as np
-
 import evaluate
+import numpy as np
 
 
 def check_correctness(check_program, timeout, task_id, completion_id):
     """
     Evaluates the functional correctness of a completion by running the test
     suite provided in the problem.
-
-    :param completion_id: an optional completion ID so we can match
-        the results later even if execution finishes asynchronously.
     """
     manager = multiprocessing.Manager()
     result = manager.list()
@@ -44,10 +46,7 @@ def check_correctness(check_program, timeout, task_id, completion_id):
 
 
 def unsafe_execute(check_program, result, timeout):
-
     with create_tempdir():
-
-        # These system calls are needed when cleaning up tempdir.
         import os
         import shutil
 
@@ -55,10 +54,8 @@ def unsafe_execute(check_program, result, timeout):
         rmdir = os.rmdir
         chdir = os.chdir
 
-        # Disable functionalities that can make destructive changes to the test.
         reliability_guard()
 
-        # Run program.
         try:
             exec_globals = {}
             with swallow_io():
@@ -70,7 +67,6 @@ def unsafe_execute(check_program, result, timeout):
         except BaseException as e:
             result.append(f"failed: {e}")
 
-        # Needed for cleaning up.
         shutil.rmtree = rmtree
         os.rmdir = rmdir
         os.chdir = chdir
@@ -110,7 +106,7 @@ class TimeoutException(Exception):
 
 
 class WriteOnlyStringIO(io.StringIO):
-    """StringIO that throws an exception when it's read from"""
+    """StringIO that throws an exception when it's read from."""
 
     def read(self, *args, **kwargs):
         raise OSError
@@ -122,7 +118,6 @@ class WriteOnlyStringIO(io.StringIO):
         raise OSError
 
     def readable(self, *args, **kwargs):
-        """Returns True if the IO object can be read."""
         return False
 
 
@@ -152,12 +147,11 @@ def reliability_guard(maximum_memory_bytes=None):
     removing filesystem files, etc.)
 
     WARNING
-    This function is NOT a security sandbox. Untrusted code, including, model-
+    This function is NOT a security sandbox. Untrusted code, including model-
     generated code, should not be blindly executed outside of one. See the
     Codex paper for more information about OpenAI's code sandbox, and proceed
     with caution.
     """
-
     if maximum_memory_bytes is not None:
         import resource
 
@@ -169,14 +163,11 @@ def reliability_guard(maximum_memory_bytes=None):
     faulthandler.disable()
 
     import builtins
-
     builtins.exit = None
     builtins.quit = None
 
     import os
-
     os.environ["OMP_NUM_THREADS"] = "1"
-
     os.kill = None
     os.system = None
     os.putenv = None
@@ -206,24 +197,22 @@ def reliability_guard(maximum_memory_bytes=None):
     os.chdir = None
 
     import shutil
-
     shutil.rmtree = None
     shutil.move = None
     shutil.chown = None
 
     import subprocess
-
     subprocess.Popen = None  # type: ignore
 
     __builtins__["help"] = None
 
     import sys
-
     sys.modules["ipdb"] = None
     sys.modules["joblib"] = None
     sys.modules["resource"] = None
     sys.modules["psutil"] = None
     sys.modules["tkinter"] = None
+
 
 _CITATION = """\
 @misc{chen2021evaluating,
@@ -257,7 +246,6 @@ described in the paper "Evaluating Large Language Models Trained on Code"
 (https://arxiv.org/abs/2107.03374).
 """
 
-
 _KWARGS_DESCRIPTION = """
 Calculates how good are predictions given some references, using certain scores
 Args:
@@ -266,20 +254,12 @@ Args:
     references: a list with a test for each prediction. Each test should evaluate the
         correctness of a code candidate.
     k: number of code candidates to consider in the evaluation (Default: [1, 10, 100])
-    num_workers: number of workers used to evaluate the canidate programs (Default: 4).
+    num_workers: number of workers used to evaluate the candidate programs (Default: 4).
     timeout:
 Returns:
     pass_at_k: dict with pass rates for each k
     results: dict with granular results of each unittest
-Examples:
-    >>> code_eval = evaluate.load("code_eval")
-    >>> test_cases = ["assert add(2,3)==5"]
-    >>> candidates = [["def add(a,b): return a*b", "def add(a, b): return a+b"]]
-    >>> pass_at_k, results = code_eval.compute(references=test_cases, predictions=candidates, k=[1, 2])
-    >>> print(pass_at_k)
-    {'pass@1': 0.5, 'pass@2': 1.0}
 """
-
 
 _WARNING = """
 ################################################################################
@@ -329,9 +309,10 @@ THE SOFTWARE."""
 
 @evaluate.utils.file_utils.add_start_docstrings(_DESCRIPTION, _KWARGS_DESCRIPTION)
 class CodeEval(evaluate.Metric):
+
+    @staticmethod
     def compute(predictions, references, k=[1, 10, 100], num_workers=4, timeout=3.0):
         """Returns the scores"""
-
         if os.getenv("HF_ALLOW_CODE_EVAL", 0) != "1":
             raise ValueError(_WARNING)
 
@@ -367,7 +348,10 @@ class CodeEval(evaluate.Metric):
         correct = np.array(correct)
 
         ks = k
-        pass_at_k = {f"pass@{k}": estimate_pass_at_k(total, correct, k).mean() for k in ks if (total >= k).all()}
+        pass_at_k = {
+            f"pass@{k}": estimate_pass_at_k(total, correct, k).mean()
+            for k in ks if (total >= k).all()
+        }
 
         return pass_at_k, results
 

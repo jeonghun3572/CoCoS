@@ -1,4 +1,4 @@
-name: correct
+name: cocos
 channels:
   - defaults
 dependencies:
