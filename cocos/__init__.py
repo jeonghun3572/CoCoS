@@ -6,7 +6,7 @@ PAD_TOKEN_CONFIG = {
     "deepseek": {"pad_token_id": 32014, "pad_token": "<|end▁of▁sentence|>"},
 }
 
-# notice: begin_toke: [BEGIN], correct_token: [CORRECT], you should change manually if the code error is occurred.
+# notice: begin_token: [BEGIN], correct_token: [CORRECT], you should change manually if error occurs.
 BOOST_TOKEN_CONFIG = {
     "llama": {"begin_token_id": [33722, 16841], "correct_token_id": [44604, 878, 45940]},
     "qwen": {"begin_token_id": [32622, 16436], "correct_token_id": [43504, 868, 44840]},

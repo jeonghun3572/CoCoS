@@ -1,7 +1,7 @@
 <h1 align="center">CoCoS: Self-Correcting Code Generation Using Small Language Models</h1>
 
 <p align="center">
-  <a href="https://arxiv.org/abs/2505.23060"><img src="https://img.shields.io/badge/arXiv-2501.13567-b31b1b.svg" alt="arXiv"></a>
+  <a href="https://arxiv.org/abs/2505.23060"><img src="https://img.shields.io/badge/arXiv-2505.23060-b31b1b.svg" alt="arXiv"></a>
   <a href="https://huggingface.co/jeonghuncho/models"><img src="https://img.shields.io/badge/%F0%9F%A4%97-Models-yellow.svg" alt="HuggingFace"></a>
 </p>
 
@@ -24,17 +24,19 @@ CoCoS/
 │   └── train.py            # Training entry point
 ├── train.py                # CoCoS training entry point
 ├── test.py                 # Evaluation entry point
-├── requirements.txt
-└── environment.yml
+└── pyproject.toml
 ```
 
-## Environment Setup
+## Setup
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/) and run:
 ```bash
-conda env create -f environment.yml
+uv sync
 ```
-or
+
+Flash Attention (recommended):
 ```bash
-pip install -r requirements.txt
+uv pip install flash-attn --no-build-isolation
 ```
 
 ## Datasets
@@ -43,15 +45,15 @@ Download the datasets:
 * (Optional) KodCode: A Diverse, Challenging, and Verifiable Synthetic Dataset for Coding (KodCode) [[github](https://github.com/KodCode-AI/kodcode)]
 
 
-## Data Format
-We follow the MBPP data format.
+### Data Format
+We follow the MBPP data format:
 ```json
 {
     "text": "<question>",
     "code": "<canonical_solution>",
     "test_list": [
         "assert ...",
-        "assert ...",
+        "assert ..."
     ]
 }
 ```
@@ -61,7 +63,7 @@ If you want to train or test using our code on a dataset other than MBPP, we rec
 ## (Optional) Boost Model
 We trained CoCoS using the Boost model, but this is not mandatory. If you do not use the Boost model, you can train it using few-shot prompting.
 
-* Data format
+### Boost Data Format
 ```json
 [
     {
@@ -76,12 +78,12 @@ We trained CoCoS using the Boost model, but this is not mandatory. If you do not
 ```
 In this paper, we trained the Boost model by fixing the ratio of first turn to second turn to 1:1.
 
-* Train
+### Boost Training
 ```bash
-deepspeed \
+uv run deepspeed \
     --num_gpus ${num_gpus} \
     --master_port ${master_port} \
-    ./boost/train.py \
+    boost/train.py \
         --deepspeed ${deepspeed} \
         --model_name_or_path ${model_name_or_path} \
         --global_batch_size ${global_batch_size} \
@@ -93,10 +95,9 @@ deepspeed \
         --weight_decay ${weight_decay}
 ```
 
-## CoCoS
-* Train
+## CoCoS Training
 ```bash
-deepspeed \
+uv run deepspeed \
     --num_gpus ${num_gpus} \
     --master_port ${master_port} \
     train.py \
@@ -111,9 +112,9 @@ deepspeed \
         --gamma ${gamma}
 ```
 
-* Test
+## Evaluation
 ```bash
-python test.py \
+uv run python test.py \
     --output_dir ${output_dir} \
     --test_data ${test_data} \
     --num_turns ${num_turns} \
@@ -121,7 +122,7 @@ python test.py \
     --model_name_or_path ${model_name_or_path}
 ```
 
-## Cite
+## Citation
 
 ```bibtex
 @misc{cho2025selfcorrectingcodegenerationusing,

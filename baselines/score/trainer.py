@@ -384,7 +384,7 @@ class SCoReTrainer(Trainer):
 
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     test_list = test_lists[i : i + args.local_rollout_forward_batch_size]
-                    reponse_for_prompt = responses_for_prompt[i : i + args.local_rollout_forward_batch_size]
+                    response_for_prompt = responses_for_prompt[i : i + args.local_rollout_forward_batch_size]
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, context_length:]
@@ -410,7 +410,7 @@ class SCoReTrainer(Trainer):
                     sequence_length = first_true_indices(postprocessed_response == processing_class.pad_token_id) - 1
 
                     score = get_reward_score(
-                        processing_class, postprocessed_response, test_list, 2, reponse_for_prompt
+                        processing_class, postprocessed_response, test_list, 2, response_for_prompt
                     )
 
                     responses.append(response)

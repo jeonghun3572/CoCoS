@@ -337,7 +337,7 @@ class CoCoSTrainer(Trainer):
 
                 for i in range(0, queries.shape[0], args.local_rollout_forward_batch_size):
                     test_list = test_lists[i : i + args.local_rollout_forward_batch_size]
-                    reponse_for_prompt = responses_for_prompt[i : i + args.local_rollout_forward_batch_size]
+                    response_for_prompt = responses_for_prompt[i : i + args.local_rollout_forward_batch_size]
                     query = queries[i : i + args.local_rollout_forward_batch_size]
                     query_response = query_responses[i : i + args.local_rollout_forward_batch_size]
                     response = query_response[:, queries.shape[1]:]
@@ -364,7 +364,7 @@ class CoCoSTrainer(Trainer):
 
                     score = get_reward_one_reward(
                         processing_class, postprocessed_response, test_list,
-                        self.num_turns, reponse_for_prompt, args.gamma,
+                        self.num_turns, response_for_prompt, args.gamma,
                     )
 
                     responses.append(response)
