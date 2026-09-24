@@ -5,11 +5,11 @@ import torch
 import argparse
 
 from accelerate import PartialState
-from rloo_config import CoCoSConfig
+from cocos_config import CoCoSConfig
 from cocos_trainer import CoCoSTrainer
 from transformers import AutoTokenizer, AutoModelForCausalLM
 
-from utils import Collator, Dataset
+from utils import Collator, Dataset, make_deepspeed_plugin
 
 def main(args):
     torch.cuda.empty_cache()
@@ -51,27 +51,20 @@ def main(args):
 
     model.resize_token_embeddings(len(tokenizer))
 
-    max_seq_len = 8192
-    max_new_tokens = 512
-    args.learning_rate = 1e-5
-    args.global_batch_size = 128
-    args.total_episodes = 1500 * args.global_batch_size
-
-
-    args.gradient_accumulation_steps = args.global_batch_size // args.per_device_train_batch_size // num_gpus
+    gradient_accumulation_steps = args.global_batch_size // args.per_device_train_batch_size // num_gpus
     training_args = CoCoSConfig(
         output_dir=args.output_dir,
         do_train=True,
         bf16=True,
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
+        gradient_accumulation_steps=gradient_accumulation_steps,
         local_rollout_forward_batch_size=args.local_rollout_forward_batch_size,
         learning_rate=args.learning_rate,
         lr_scheduler_type=args.lr_scheduler_type,
         weight_decay=args.weight_decay,
         warmup_ratio=args.warmup_ratio,
-        total_episodes=args.total_episodes,
+        total_episodes=args.num_steps * args.global_batch_size,
         eval_strategy="steps",
         save_strategy="steps",
         eval_steps=args.save_steps,
@@ -91,8 +84,8 @@ def main(args):
         rloo_k=args.rloo_k,
         dataset_num_proc=num_gpus,
         remove_unused_columns=False,
-        max_seq_len=max_seq_len,
-        response_length=max_new_tokens,
+        max_seq_len=args.max_seq_len,
+        response_length=args.max_new_tokens,
         save_safetensors=False,
         greater_is_better=True,
         metric_for_best_model="eval_reward",
@@ -102,11 +95,11 @@ def main(args):
 
     data_collator = Collator()
     train_dataset = Dataset(args.train_data)
-    if args.eval_data is not None:
-        eval_dataset = Dataset(args.eval_data)
+    eval_dataset = Dataset(args.eval_data) if args.eval_data is not None else None
     fewshot_dataset = Dataset(args.fewshot_data) if args.fewshot_data is not None else None
 
     ref_policy = trl.create_reference_model(model)
+    deepspeed_plugin = make_deepspeed_plugin(args.deepspeed, args.per_device_train_batch_size, gradient_accumulation_steps) if args.deepspeed else None
 
     trainer = CoCoSTrainer(
         config=training_args,
@@ -115,9 +108,10 @@ def main(args):
         ref_policy=ref_policy,
         reward_model=None,
         train_dataset=train_dataset,
-        eval_dataset=eval_dataset if args.eval_data is not None else None,
+        eval_dataset=eval_dataset,
         fewshot_dataset=fewshot_dataset,
         data_collator=data_collator,
+        deepspeed_plugin=deepspeed_plugin,
     )
 
     trainer.train()
@@ -127,34 +121,35 @@ def main(args):
         wandb.finish()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a model with SFTTrainer")
+    parser = argparse.ArgumentParser(description="Train a model with CoCoS")
 
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument("--output_dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
-    parser.add_argument("--train_data", type=str, required=True, help="Path to the training data file")
-    parser.add_argument("--eval_data", type=str, default=None, help="Path to the evaluation data file")
-    parser.add_argument("--fewshot_data", type=str, default=None, help="Path to the few-shot data file")
-    parser.add_argument("--global_batch_size", type=int, default=256, help="Batch size (including gradient accumulation, multi-gpu training)")
-    parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Batch size per device during training")
-    parser.add_argument("--per_device_eval_batch_size", type=int, default=1, help="Batch size per device during evaluation")
-    parser.add_argument("--learning_rate", type=float, default=5e-5, help="The initial learning rate for Adam")
-    parser.add_argument("--lr_scheduler_type", type=str, default="cosine", help="The scheduler type to use", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay if we apply some")
-    parser.add_argument("--num_train_epochs", type=int, default=5, help="Total number of training epochs to perform")
-    parser.add_argument("--warmup_ratio", type=float, default=0.0, help="Linear warmup over warmup_ratio fraction of total steps")
-    parser.add_argument("--wandb_run_name", type=str, default=None, help="Name of the W&B run")
-    parser.add_argument("--model_name_or_path", type=str, required=True, help="Model identifier to load from huggingface.co/models")
-    parser.add_argument("--local_rollout_forward_batch_size", type=int, default=1, help="local_rollout_forward_batch_size")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
-    parser.add_argument("--rloo_k", type=int, default=2, help="rloo_k")
-    parser.add_argument("--report_to", type=str, default="tensorboard")
-    parser.add_argument("--save_steps", type=float, default=0.1)
-    parser.add_argument("--num_turns", type=int, default=2)
+    parser.add_argument("--output-dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
+    parser.add_argument("--train-data", type=str, required=True, help="Path to the training data file")
+    parser.add_argument("--eval-data", type=str, default=None, help="Path to the evaluation data file")
+    parser.add_argument("--fewshot-data", type=str, default=None, help="Path to the few-shot data file")
+    parser.add_argument("--global-batch-size", type=int, default=128, help="Batch size (including gradient accumulation, multi-gpu training)")
+    parser.add_argument("--per-device-train-batch-size", type=int, default=1, help="Batch size per device during training")
+    parser.add_argument("--per-device-eval-batch-size", type=int, default=1, help="Batch size per device during evaluation")
+    parser.add_argument("--learning-rate", type=float, default=1e-5, help="The initial learning rate for Adam")
+    parser.add_argument("--lr-scheduler-type", type=str, default="cosine", help="The scheduler type to use", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
+    parser.add_argument("--weight-decay", type=float, default=0.0, help="Weight decay if we apply some")
+    parser.add_argument("--warmup-ratio", type=float, default=0.0, help="Linear warmup over warmup_ratio fraction of total steps")
+    parser.add_argument("--num-steps", type=int, default=1500, help="Number of training steps (total episodes = num_steps * global_batch_size)")
+    parser.add_argument("--max-seq-len", type=int, default=8192, help="Maximum prompt length")
+    parser.add_argument("--max-new-tokens", type=int, default=512, help="Maximum number of generated tokens")
+    parser.add_argument("--wandb-run-name", type=str, default=None, help="Name of the W&B run")
+    parser.add_argument("--model-name-or-path", type=str, required=True, help="Model identifier to load from huggingface.co/models")
+    parser.add_argument("--local-rollout-forward-batch-size", type=int, default=1, help="local_rollout_forward_batch_size")
+    parser.add_argument("--rloo-k", type=int, default=2, help="rloo_k")
+    parser.add_argument("--report-to", type=str, default="tensorboard")
+    parser.add_argument("--save-steps", type=float, default=0.1)
+    parser.add_argument("--num-turns", type=int, default=2)
     parser.add_argument("--gamma", type=float, default=0.5, help="Discount factor for rewards")
 
-    # DeepSpeed
-    parser.add_argument("--local_rank", type=int)
-    parser.add_argument("--deepspeed", type=str, default="")
+    # DeepSpeed launcher passes --local_rank
+    parser.add_argument("--local-rank", "--local_rank", type=int)
+    parser.add_argument("--deepspeed", type=str, default="", help="Path to the DeepSpeed config (e.g. deepspeed_zero2.json)")
 
     args = parser.parse_args()
 

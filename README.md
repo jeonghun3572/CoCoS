@@ -53,6 +53,8 @@ We trained CoCoS using the Boost model, but this is not mandatory. If you do not
 ```
 In this paper, we trained the Boost model by fixing the ratio of first turn to second turn to 1:1.
 
+The loss is computed only on the tokens after `[BEGIN]` (first turn) or `[CORRECT]` (second turn), so the training data must contain them as shown above. If they are missing, the collator warns `Could not find ...` and ignores the sample in the loss.
+
 * Train
 ```
 echo "Boost model Training"
@@ -60,15 +62,15 @@ deepspeed \
     --num_gpus ${num_gpus} \
     --master_port ${master_port} \
     ./boost/boost_train.py \
-        --deepspeed {deepspeed} \
-        --model_name_or_path ${model_name_or_path} \
-        --global_batch_size ${global_batch_size} \
-        --train_data ${train_data} \
-        --eval_data ${eval_data} \
-        --output_dir ${output_dir} \
-        --report_to wandb \
-        --wandb_run_name ${wandb_run_name} \
-        --weight_decay ${weight_decay} \
+        --deepspeed deepspeed_zero2.json \
+        --model-name-or-path ${model_name_or_path} \
+        --global-batch-size ${global_batch_size} \
+        --train-data ${train_data} \
+        --eval-data ${eval_data} \
+        --output-dir ${output_dir} \
+        --report-to wandb \
+        --wandb-run-name ${wandb_run_name} \
+        --weight-decay ${weight_decay} \
 ```
 
 ## CoCoS
@@ -79,25 +81,25 @@ deepspeed \
     --num_gpus ${num_gpus} \
     --master_port ${master_port} \
     train.py \
-        --deepspeed ${deepspeed} \
-        --model_name_or_path ${model_name_or_path} \
-        --local_rollout_forward_batch_size ${local_rollout_forward_batch_size} \
-        --train_data ${train_data} \
-        --output_dir ${output_dir} \
-        --report_to wandb \
-        --wandb_run_name ${wandb_run_name} \
-        --rloo_k ${rloo_k} \
+        --deepspeed deepspeed_zero2.json \
+        --model-name-or-path ${model_name_or_path} \
+        --local-rollout-forward-batch-size ${local_rollout_forward_batch_size} \
+        --train-data ${train_data} \
+        --output-dir ${output_dir} \
+        --report-to wandb \
+        --wandb-run-name ${wandb_run_name} \
+        --rloo-k ${rloo_k} \
         --gamma ${gamma} \
 ```
 
 * Test
 ```
 python test.py \
-    --output_dir ${output_dir} \
-    --test_data ${test_data} \
-    --num_turns ${num_turns} \
-    --batch_size ${batch_size} \
-    --model_name_or_path ${model_name_or_path} \
+    --output-dir ${output_dir} \
+    --test-data ${test_data} \
+    --num-turns ${num_turns} \
+    --batch-size ${batch_size} \
+    --model-name-or-path ${model_name_or_path} \
 
 ```
 

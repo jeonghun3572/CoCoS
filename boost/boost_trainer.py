@@ -22,6 +22,7 @@ from transformers import (
     PreTrainedTokenizerBase,
     ProcessorMixin,
     Trainer,
+    is_wandb_available,
 )
 from transformers.trainer_callback import TrainerCallback
 from transformers.trainer_utils import EvalPrediction
@@ -44,6 +45,9 @@ if is_peft_available():
 
 if is_liger_kernel_available():
     from liger_kernel.transformers import AutoLigerKernelForCausalLM
+
+if is_wandb_available():
+    import wandb
 
 
 class BoostTrainer(Trainer):

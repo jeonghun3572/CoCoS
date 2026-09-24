@@ -54,11 +54,10 @@ def main(args):
         tokenizer.pad_token_id = 32014
     model.resize_token_embeddings(len(tokenizer))
 
-    max_new_tokens = 512
     generation_config = GenerationConfig(
         do_sample=False,
         num_beams=1,
-        max_new_tokens=max_new_tokens,
+        max_new_tokens=args.max_new_tokens,
         pad_token_id=model.config.pad_token_id,
         bos_token_id=model.config.bos_token_id,
         eos_token_id=model.config.eos_token_id,
@@ -79,11 +78,11 @@ def main(args):
     for batch in tqdm(data_loader):
         output_batch_turn = []
         for num_turn in range(1, args.num_turns + 1):
-            prompts = make_prompt(batch, num_turn, args.task, responses_for_prompt, fewshot)
+            prompts = make_prompt(batch, num_turn, responses_for_prompt, fewshot)
             prompts = tokenizer.batch_encode_plus(
                 prompts,
                 padding='longest',
-                max_length=8192,
+                max_length=args.max_length,
                 truncation=True,
                 return_tensors='pt',
                 return_attention_mask=True,
@@ -129,9 +128,7 @@ def main(args):
             eval_total.append(eval_results_per_batch)
 
 
-    parts = args.model_name_or_path.split('/')
-    log_name = f"{parts[-2]}-{parts[-1]}"
-    # log_name = f"{args.model_name_or_path.split('/')[-1]}"
+    log_name = "-".join(args.model_name_or_path.split('/')[-2:])
     with open(f"{args.output_dir}/{log_name}.jsonl", "w", encoding="utf-8") as f:
         for data in total:
             f.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -152,16 +149,16 @@ def main(args):
     print(f"Files are saved in {args.output_dir}/{log_name}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a model with SFTTrainer")
+    parser = argparse.ArgumentParser(description="Evaluate a model with multi-turn self-correction")
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument("--output_dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
-    parser.add_argument("--test_data", type=str, required=True, help="Path to the training data file")
-    parser.add_argument("--model_name_or_path", type=str, required=True, help="Path to the model")
-    parser.add_argument("--tensor_parallel_size", type=int, default=1, help="Size of the tensor parallelism")
-    parser.add_argument("--num_turns", type=int, default=2, help="Number of turns")
-    parser.add_argument("--task", type=str, default="code", choices=["code", "math"])
-    parser.add_argument("--batch_size", type=int, default=8, help="Batch size for evaluation")
-    parser.add_argument("--fewshot_data", type=str, default=None, help="Path to the few-shot data file")
+    parser.add_argument("--output-dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
+    parser.add_argument("--test-data", type=str, required=True, help="Path to the test data file")
+    parser.add_argument("--model-name-or-path", type=str, required=True, help="Path to the model")
+    parser.add_argument("--num-turns", type=int, default=2, help="Number of turns")
+    parser.add_argument("--batch-size", type=int, default=8, help="Batch size for evaluation")
+    parser.add_argument("--fewshot-data", type=str, default=None, help="Path to the few-shot data file")
+    parser.add_argument("--max-length", type=int, default=8192, help="Maximum prompt length")
+    parser.add_argument("--max-new-tokens", type=int, default=512, help="Maximum number of generated tokens")
     args = parser.parse_args()
 
     main(args)

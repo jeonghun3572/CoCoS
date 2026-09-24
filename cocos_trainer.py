@@ -1,14 +1,13 @@
 import gc
 import math
 import os
-import random
 import time
 from typing import Callable, Optional, Union
 import numpy as np
 import torch
 import torch.nn as nn
 from accelerate import Accelerator, InitProcessGroupKwargs
-from accelerate.utils import broadcast
+from accelerate.utils import broadcast, DeepSpeedPlugin
 from datasets import Dataset
 from torch.utils.data import DataLoader
 from transformers import (
@@ -34,9 +33,7 @@ from trl.trainer.utils import (
     batch_generation,
     selective_log_softmax,
     forward,
-    generate,
 )
-import utils
 from utils import (
     make_fewshot,
     make_prompt,
@@ -70,6 +67,7 @@ class CoCoSTrainer(Trainer):
         optimizers: tuple[torch.optim.Optimizer, torch.optim.lr_scheduler.LambdaLR] = (None, None),
         callbacks: Optional[list[TrainerCallback]] = None,
         fewshot_dataset: Optional[Dataset] = None,
+        deepspeed_plugin: Optional[DeepSpeedPlugin] = None,
     ) -> None:
         if ref_policy is policy:
             raise ValueError(
@@ -112,6 +110,7 @@ class CoCoSTrainer(Trainer):
         accelerator = Accelerator(
             kwargs_handlers=[ipg_handler],
             gradient_accumulation_steps=args.gradient_accumulation_steps,
+            deepspeed_plugin=deepspeed_plugin,
         )
         self.accelerator = accelerator
         args.world_size = accelerator.num_processes

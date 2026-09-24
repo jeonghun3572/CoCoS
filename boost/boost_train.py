@@ -6,9 +6,9 @@ import argparse
 from datasets import load_dataset
 from accelerate import PartialState
 
-from sft_trainer import BoostTrainer
 from trl import SFTConfig
 from transformers import AutoTokenizer, AutoModelForCausalLM, EarlyStoppingCallback
+from boost_trainer import BoostTrainer
 from boost_collator import BoostCollator
 
 
@@ -16,7 +16,6 @@ def main(args):
     torch.cuda.empty_cache()
     os.environ['CUDA_LAUNCH_BLOCKING']="1"
 
-    num_gpus = torch.cuda.device_count()
     torch.manual_seed(args.seed)
     os.makedirs(args.output_dir, exist_ok=True)
 
@@ -51,7 +50,7 @@ def main(args):
         tokenizer.pad_token_id = 151643
         begin_token_id = [32622, 16436]
         correct_token_id = [43504, 868, 44840]
-    
+
     elif "deepseek" in model_id:
         model.config.pad_token_id = 32014
         tokenizer.pad_token = "<|end▁of▁sentence|>"
@@ -59,24 +58,27 @@ def main(args):
         begin_token_id = [58, 29509, 60]
         correct_token_id = [58, 34, 1692, 25661, 60]
 
+    else:
+        raise ValueError(f"Unsupported model: {args.model_name_or_path}. Add the pad token and the token ids of [BEGIN and [CORRECT for this model.")
+
     model.resize_token_embeddings(len(tokenizer))
-    max_seq_len = 8192
     data_collator = BoostCollator(
         response_template=begin_token_id,
         response_template_2=correct_token_id,
         tokenizer=tokenizer
     )
-    args.gradient_accumulation_steps = args.global_batch_size // args.per_device_train_batch_size // torch.cuda.device_count()
+    gradient_accumulation_steps = args.global_batch_size // args.per_device_train_batch_size // torch.cuda.device_count()
 
     training_args = SFTConfig(
         output_dir=args.output_dir,
         do_train=True,
         do_eval=True,
         bf16=True,
+        deepspeed=args.deepspeed if args.deepspeed else None,
         per_device_train_batch_size=args.per_device_train_batch_size,
         per_device_eval_batch_size=args.per_device_eval_batch_size,
-        gradient_accumulation_steps=args.gradient_accumulation_steps,
-        max_steps=1000,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        max_steps=args.max_steps,
         eval_strategy="steps",
         save_strategy="steps",
         eval_steps=args.eval_steps,
@@ -92,8 +94,8 @@ def main(args):
         report_to=args.report_to,
         save_total_limit=1,
         ddp_find_unused_parameters=False,
-        dataset_num_proc=30,
-        max_seq_length=max_seq_len,
+        dataset_num_proc=args.dataset_num_proc,
+        max_seq_length=args.max_seq_len,
         save_safetensors=False,
         metric_for_best_model="eval_loss",
         load_best_model_at_end=True,
@@ -104,7 +106,7 @@ def main(args):
         if isinstance(logits, tuple):
             logits = logits[0]
         return logits.argmax(dim=-1)
-    
+
     def formatting_prompts_func(example):
         output_texts = []
         for i in range(len(example['prompt'])):
@@ -124,7 +126,7 @@ def main(args):
         processing_class=tokenizer,
         preprocess_logits_for_metrics=preprocess_logits_for_metrics,
         formatting_func=formatting_prompts_func,
-        callbacks=[EarlyStoppingCallback(early_stopping_patience=1)],
+        callbacks=[EarlyStoppingCallback(early_stopping_patience=args.early_stopping_patience)],
     )
 
     trainer.train()
@@ -132,29 +134,31 @@ def main(args):
         wandb.finish()
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Train a model with SFTTrainer")
+    parser = argparse.ArgumentParser(description="Train the Boost model")
 
     parser.add_argument("--seed", type=int, default=42, help="Random seed for initialization")
-    parser.add_argument("--output_dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
-    parser.add_argument("--train_data", type=str, required=True, help="Path to the training data file")
-    parser.add_argument("--eval_data", type=str, required=True, help="Path to the evaluation data file")
-    parser.add_argument("--eval_steps", type=float, default=0.1, help="Number of steps between evaluations")
-    parser.add_argument("--global_batch_size", type=int, default=256, help="Batch size (including gradient accumulation, multi-gpu training)")
-    parser.add_argument("--per_device_train_batch_size", type=int, default=1, help="Batch size per device during training")
-    parser.add_argument("--per_device_eval_batch_size", type=int, default=1, help="Batch size for evaluation")
-    parser.add_argument("--learning_rate", type=float, default=2e-5, help="The initial learning rate for Adam")
-    parser.add_argument("--lr_scheduler_type", type=str, default="cosine", help="The scheduler type to use", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
-    parser.add_argument("--weight_decay", type=float, default=0.0, help="Weight decay if we apply some")
-    parser.add_argument("--num_train_epochs", type=int, default=1, help="Total number of training epochs to perform")
-    parser.add_argument("--warmup_ratio", type=float, default=0.0, help="Linear warmup over warmup_ratio fraction of total steps")
-    parser.add_argument("--wandb_run_name", type=str, default=None, help="Name of the W&B run")
-    parser.add_argument("--model_name_or_path", type=str, required=True, help="Model identifier to load from huggingface.co/models")
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=1)
-    parser.add_argument("--report_to", type=str, default="tensorboard")
+    parser.add_argument("--output-dir", type=str, required=True, help="The output directory where the model predictions and checkpoints will be written")
+    parser.add_argument("--train-data", type=str, required=True, help="Path to the training data file")
+    parser.add_argument("--eval-data", type=str, required=True, help="Path to the evaluation data file")
+    parser.add_argument("--eval-steps", type=float, default=0.1, help="Number of steps between evaluations")
+    parser.add_argument("--global-batch-size", type=int, default=256, help="Batch size (including gradient accumulation, multi-gpu training)")
+    parser.add_argument("--per-device-train-batch-size", type=int, default=1, help="Batch size per device during training")
+    parser.add_argument("--per-device-eval-batch-size", type=int, default=1, help="Batch size for evaluation")
+    parser.add_argument("--learning-rate", type=float, default=2e-5, help="The initial learning rate for Adam")
+    parser.add_argument("--lr-scheduler-type", type=str, default="cosine", help="The scheduler type to use", choices=["linear", "cosine", "cosine_with_restarts", "polynomial", "constant", "constant_with_warmup"])
+    parser.add_argument("--weight-decay", type=float, default=0.0, help="Weight decay if we apply some")
+    parser.add_argument("--max-steps", type=int, default=1000, help="Total number of training steps to perform")
+    parser.add_argument("--max-seq-len", type=int, default=8192, help="Maximum sequence length")
+    parser.add_argument("--dataset-num-proc", type=int, default=30, help="Number of processes for dataset tokenization")
+    parser.add_argument("--early-stopping-patience", type=int, default=1, help="Early stopping patience")
+    parser.add_argument("--warmup-ratio", type=float, default=0.0, help="Linear warmup over warmup_ratio fraction of total steps")
+    parser.add_argument("--wandb-run-name", type=str, default=None, help="Name of the W&B run")
+    parser.add_argument("--model-name-or-path", type=str, required=True, help="Model identifier to load from huggingface.co/models")
+    parser.add_argument("--report-to", type=str, default="tensorboard")
 
-    # DeepSpeed
-    parser.add_argument("--local_rank", type=int)
-    parser.add_argument("--deepspeed", type=str, default="")
+    # DeepSpeed launcher passes --local_rank
+    parser.add_argument("--local-rank", "--local_rank", type=int)
+    parser.add_argument("--deepspeed", type=str, default="", help="Path to the DeepSpeed config (e.g. deepspeed_zero2.json)")
 
     args = parser.parse_args()
 

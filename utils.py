@@ -1,9 +1,8 @@
 import re
 import json
-import random
 import torch
-import difflib
 
+from accelerate.utils import DeepSpeedPlugin
 from code_evaluation import CodeEval
 
 class Collator(object):
@@ -30,7 +29,19 @@ class Dataset(torch.utils.data.Dataset):
     def __getitem__(self, index):
         return self.data[index]
 
-def code_process(text, test_list=None):
+def make_deepspeed_plugin(config_path, per_device_train_batch_size, gradient_accumulation_steps):
+    # Match the RL training loop: micro batch = per-device batch, bf16 model, no gradient clipping
+    plugin = DeepSpeedPlugin(
+        hf_ds_config=config_path,
+        gradient_accumulation_steps=gradient_accumulation_steps,
+        gradient_clipping=0.0,
+    )
+    plugin.deepspeed_config["train_micro_batch_size_per_gpu"] = per_device_train_batch_size
+    plugin.deepspeed_config["bf16"] = {"enabled": True}
+    return plugin
+
+
+def code_process(text):
     pattern1 = r'^(.*?)\[DONE\]'
     pattern2 = r'\[CORRECT\].*?\[DONE\]'
     pattern3 = r'\[BEGIN\].*?\[DONE\]'
@@ -227,60 +238,6 @@ def calculate_improve(prev, curr):
 
     return improvement, inco_co, co_inco, inco_inco, co_co
 
-
-
-def make_prompt_humaneval(batch, num_turn, responses_for_prompt=None):
-    prompts = []
-    for i, data in enumerate(batch):
-        test_list = '\n'.join(data['test_list'])
-        prompt = f"""You are an expert Python programmer, and here is your task: Write a python function {data['entry_point']}. Your code should pass these tests:
-
-{test_list.strip()}
-
-[BEGIN]
-"""
-        if num_turn > 1:
-            prompt += f"{responses_for_prompt[i][-1].rstrip()}\n[DONE]\n\nThere might be an error in the code above because of lack of understanding of the question. Please correct the error, if any, and rewrite the solution. Only output the final correct Python program!\n\n[CORRECT]\n"
-        prompts.append(prompt)
-    return prompts
-
-
-def get_reward_humaneval(tokenizer, query_responses, test_lists, num_turns, corrects=None, responses_for_prompt=None):
-    total_responses_for_prompt = []
-    total_correct = []
-
-    assert len(query_responses) == len(test_lists)
-    for i, (query_response, test_list) in enumerate(zip(query_responses, test_lists)):
-        query_response = code_process(query_response)
-        correct_count = 0
-        if num_turns == 1:
-            total_responses_for_prompt.append([query_response])
-
-            for testcase in test_list:
-                try:
-                    pass_at_k, result = CodeEval.compute(references=[testcase], predictions=[[query_response]], k=[1])
-                    if float(pass_at_k["pass@1"]) == 1.0:
-                        correct_count += 1
-                except:
-                    pass
-            total_correct.append([f"pass_{correct_count}_{len(test_list)}"])
-
-        elif num_turns > 1:
-            assert corrects is not None
-            responses_for_prompt[i].append(query_response)
-            total_responses_for_prompt.append(responses_for_prompt[i])
-
-            for testcase in test_list:
-                try:
-                    pass_at_k, result = CodeEval.compute(references=[testcase], predictions=[[query_response]], k=[1])
-                    if float(pass_at_k["pass@1"]) == 1.0:
-                        correct_count += 1
-                except:
-                    pass
-            corrects[i].append(f"pass_{correct_count}_{len(test_list)}")
-            total_correct.append(corrects[i])
-
-    return total_correct, total_responses_for_prompt
 
 
 def get_reward_score(tokenizer, query_responses, test_lists, num_turns, responses_for_prompt, gamma=0.5):
